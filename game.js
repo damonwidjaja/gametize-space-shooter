@@ -1,87 +1,5 @@
-// --- SUPABASE SETUP --- 
-const SUPABASE_URL = 'https://pdrsqbwqkgoqlmaqqraz.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkcnNxYndxa2dvcWxtYXFxcmF6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQ5NjI4MDEsImV4cCI6MjA2MDUzODgwMX0._JOdIOhJXDyDjSE8CTjg0GzCKws5hbh8bsuhusoXAiw';
-
-// Initialize Supabase client
-let supabase = null;
-
-function initializeSupabase() {
-    return new Promise((resolve, reject) => {
-        try {
-            // Wait for Supabase to be available
-            if (typeof window.createClient !== 'undefined') {
-                supabase = window.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-                console.log('Supabase client initialized with createClient');
-                resolve(supabase);
-            } else if (typeof window.supabase !== 'undefined') {
-                supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-                console.log('Supabase client initialized with window.supabase');
-                resolve(supabase);
-            } else {
-                // Wait a bit and try again
-                setTimeout(() => {
-                    if (typeof window.supabase !== 'undefined') {
-                        supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-                        console.log('Supabase client initialized after delay');
-                        resolve(supabase);
-                    } else {
-                        reject(new Error('Supabase client not available after delay'));
-                    }
-                }, 1000); // Wait 1 second and try again
-            }
-        } catch (error) {
-            console.error('Error initializing Supabase client:', error);
-            reject(error);
-        }
-    });
-}
-
-// Test the connection
-async function testSupabaseConnection() {
-    if (!supabase) {
-        console.error('Cannot test connection: Supabase client not initialized');
-        return false;
-    }
-    try {
-        const { data, error } = await supabase
-            .from('leaderboard')
-            .select('count')
-            .limit(1);
-            
-        if (error) {
-            console.error('Supabase connection test failed:', error);
-            return false;
-        } else {
-            console.log('Supabase connection test successful');
-            return true;
-        }
-    } catch (error) {
-        console.error('Error testing Supabase connection:', error);
-        return false;
-    }
-}
-
-// Initialize the game when the page loads
-window.addEventListener('load', async () => {
-    console.log('Window loaded, initializing Supabase...');
-    try {
-        await initializeSupabase();
-        const connectionSuccessful = await testSupabaseConnection();
-        if (connectionSuccessful) {
-            console.log('Supabase connection verified, initializing game...');
-            window.spaceShooterGame = new SpaceShooter();
-            console.log('Game initialized successfully');
-        } else {
-            console.error('Failed to verify Supabase connection');
-            alert('Warning: Leaderboard functionality may be limited');
-            window.spaceShooterGame = new SpaceShooter();
-        }
-    } catch (error) {
-        console.error('Error during initialization:', error);
-        alert('Warning: Leaderboard functionality may be limited');
-        window.spaceShooterGame = new SpaceShooter();
-    }
-});
+// --- GAMETIZE API SETUP --- 
+const GAMETIZE_API_KEY = 'API KEY'; // Replace with your actual Gametize API key
 
 class SpaceShooter {
     constructor() {
@@ -141,7 +59,7 @@ class SpaceShooter {
         this.lastScore = 0;
         this.level = 1;
         this.gameTime = 0;
-        this.timeLeft = 60;
+        this.timeLeft = 30;
         this.isGameOver = false;
         this.isTriviaActive = false;
         this.hasActiveStar = false;
@@ -341,13 +259,6 @@ class SpaceShooter {
                 e.preventDefault();
                 console.log('Save score form submitted.');
 
-                if (!supabase) {
-                    console.error('Cannot save score, Supabase not initialized.');
-                    alert('Error: Unable to save score. Please try again later.');
-                    this.closeScoreModalAndReturnHome();
-                    return;
-                }
-
                 const nickname = e.target.nickname.value.trim();
                 if (!nickname) {
                     alert('Please enter a nickname.');
@@ -360,25 +271,37 @@ class SpaceShooter {
                 try {
                     // Get current timestamp in ISO format
                     const timestamp = new Date().toISOString();
-
-                    const { data, error } = await supabase
-                        .from('leaderboard')
-                        .insert([{ 
-                            nickname: nickname, 
+                    
+                    // Check if user is authenticated
+                    if (window.auth && window.auth.isAuthenticated()) {
+                        // No code is required here for now
+                    } else {
+                        // Save to localStorage for anonymous users
+                        const localLeaderboard = localStorage.getItem('leaderboard');
+                        let leaderboard = localLeaderboard ? JSON.parse(localLeaderboard) : [];
+                        
+                        // Add new score
+                        leaderboard.push({
+                            nickname: nickname,
                             score: scoreToSave,
                             created_at: timestamp
-                        }])
-                        .select(); // Add this to get the response with the generated ID
-
-                    if (error) {
-                        console.error('Error saving score to Supabase:', error);
-                        alert(`Error saving score: ${error.message}`);
-                    } else {
-                        console.log('Score saved successfully to Supabase:', data);
+                        });
+                        
+                        // Sort by score (descending)
+                        leaderboard.sort((a, b) => b.score - a.score);
+                        
+                        // Keep only top 10
+                        leaderboard = leaderboard.slice(0, 10);
+                        
+                        // Save back to localStorage
+                        localStorage.setItem('leaderboard', JSON.stringify(leaderboard));
+                        
+                        console.log('Score saved successfully to localStorage');
                         alert('Score submitted successfully!');
-                        // Update the leaderboard display
-                        this.updateLeaderboardDisplay(false);
                     }
+                    
+                    // Update the leaderboard display
+                    this.updateLeaderboardDisplay(false);
                 } catch (error) {
                     console.error('Error during score submission:', error);
                     alert('An unexpected error occurred while submitting your score.');
@@ -440,7 +363,7 @@ class SpaceShooter {
         this.score = 0;
         this.level = 1;
         this.gameTime = 0;
-        this.timeLeft = 60;
+        this.timeLeft = 30;
         this.isGameOver = false;
         this.bullets = [];
         this.enemies = [];
@@ -475,50 +398,44 @@ class SpaceShooter {
     }
 
     endGame() {
-        if (this.isGameOver) return; // Prevent running multiple times
         this.isGameOver = true;
-        console.log('Game Over! Final Score:', this.score);
-
-        // Stop the game loop explicitly
-        if (this.animationFrameId) {
-            cancelAnimationFrame(this.animationFrameId);
-            this.animationFrameId = null;
-        }
-        // Clear shooting timeout
-        if (this.shootTimeoutId) {
-            clearTimeout(this.shootTimeoutId);
-            this.shootTimeoutId = null;
-        }
-
-        this.saveScore(); // Save score to leaderboard
-
-        // --- Draw Game Over Screen --- 
-        this.ctx.save();
-        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.75)'; // Darker overlay
-        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-        this.ctx.fillStyle = '#ff0000'; // Red Game Over text
-        this.ctx.font = 'bold 60px Arial';
-        this.ctx.textAlign = 'center';
-        this.ctx.shadowColor = '#000';
-        this.ctx.shadowBlur = 10;
-        this.ctx.fillText('GAME OVER', this.canvas.width / 2, this.canvas.height / 2 - 40);
+        this.stopShooting();
+        this.stopMusic();
+        cancelAnimationFrame(this.animationFrameId);
         
-        this.ctx.fillStyle = '#ffffff'; // White score text
-        this.ctx.font = 'bold 30px Arial';
-        this.ctx.shadowBlur = 5;
-        this.ctx.fillText(`Final Score: ${this.score}`, this.canvas.width / 2, this.canvas.height / 2 + 30);
-        this.ctx.restore();
-        // ------------------------------
-
-        // Show score submission prompt after a delay
-        setTimeout(() => {
-            this.promptToSaveScore(); 
-        }, 2000); // Show Game Over for 2 seconds before prompt
-
-        // Hide flames
-        if (this.player.flames && this.player.flames.container) {
-            this.player.flames.container.style.display = 'none';
+        // Call the challenge completion API if user is logged in
+        if (window.auth && window.auth.isAuthenticated()) {
+            const sessionKey = localStorage.getItem('gametizeSessionKey');
+            const challengeId = '576884'; // Replace with actual challenge ID
+            
+            if (sessionKey) {
+                const formData = new URLSearchParams();
+                formData.append('session_key', sessionKey);
+                formData.append('challenge_id', challengeId);
+                formData.append('comment', `${this.score} points`);
+                
+                fetch('https://gametize.com/api2/action/complete.json', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded'
+                    },
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.code === 200) {
+                        console.log('Challenge completed successfully');
+                    } else {
+                        console.error('Failed to complete challenge:', data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error completing challenge:', error);
+                });
+            }
         }
+        
+        this.promptToSaveScore();
     }
 
     startShooting() {
@@ -651,8 +568,8 @@ class SpaceShooter {
         
         this.gameTime += 16;
 
-        // Calculate level based on game time (every 30 seconds)
-        const newLevel = Math.floor(this.gameTime / 30000) + 1;
+        // Calculate level based on game time (every 15 seconds)
+        const newLevel = Math.floor(this.gameTime / 15000) + 1;
         if (newLevel > this.level) {
             this.level = newLevel;
             console.log('Level increased to:', this.level);
@@ -690,7 +607,7 @@ class SpaceShooter {
 
         // Update timer
         if (this.timeLeft > 0) {
-            this.timeLeft = Math.max(0, 60 - Math.floor(this.gameTime / 1000));
+            this.timeLeft = Math.max(0, 30 - Math.floor(this.gameTime / 1000));
             const timeLeft = document.getElementById('timeLeft');
             if (timeLeft) {
                 timeLeft.textContent = this.timeLeft;
@@ -945,11 +862,6 @@ class SpaceShooter {
         this.getLeaderboard().then(scores => {
             leaderboardList.innerHTML = '';
 
-            if (!supabase) {
-                leaderboardList.innerHTML = '<li><div class="error">Leaderboard disabled (Supabase not configured).</div></li>';
-                return;
-            }
-
             if (scores.length === 0) {
                 leaderboardList.innerHTML = '<li><div class="empty">No scores yet! Play a game.</div></li>';
             } else {
@@ -1007,17 +919,28 @@ class SpaceShooter {
 
     async getLeaderboard() {
         try {
-            const { data, error } = await supabase
-                .from('leaderboard')
-                .select('*')
-                .order('score', { ascending: false })
-                .limit(10);
-
-            if (error) {
-                console.error('Error fetching leaderboard:', error);
+            // Use localStorage for leaderboard if not authenticated
+            if (!window.auth || !window.auth.isAuthenticated()) {
+                const localLeaderboard = localStorage.getItem('leaderboard');
+                return localLeaderboard ? JSON.parse(localLeaderboard) : [];
+            }
+            
+            // If authenticated, fetch from Gametize API
+            const response = await fetch(`https://gametize.com/api2/leaderboard.json?api_key=${GAMETIZE_API_KEY}`, {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                return data.leaderboard || [];
+            } else {
+                console.error('Error fetching leaderboard:', data.message);
                 return [];
             }
-            return data || [];
         } catch (error) {
             console.error('Error in getLeaderboard:', error);
             return [];
@@ -1322,4 +1245,17 @@ class SpaceShooter {
         
         console.log('Multi-shot activated');
     }
-} 
+
+    stopMusic() {
+        if (this.backgroundMusic) {
+            this.backgroundMusic.pause();
+            this.isMusicPlaying = false;
+            this.updateMusicButtonState();
+        }
+    }
+}
+
+// Initialize the game
+document.addEventListener('DOMContentLoaded', () => {
+    const game = new SpaceShooter();
+}); 

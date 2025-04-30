@@ -20,6 +20,11 @@
                 <button id="startGameBtn" class="start-button">Start Game</button>
                 <button id="showLeaderboardBtn" class="leaderboard-button">Leaderboard</button>
                 <button id="howToPlayBtn" class="how-to-play-button">How to Play</button>
+                <div class="auth-buttons">
+                    <button id="signInBtn" class="green-button">Sign In</button>
+                    <button id="signUpBtn" class="green-button">Sign Up</button>
+                    <button id="signOutBtn" class="green-button" style="display: none;">Sign Out</button>
+                </div>
             </div>
         </div>
     </div>
@@ -56,6 +61,7 @@
             </div>
             <div class="game-area">
                 <canvas id="gameCanvas"></canvas>
+                <button id="endGameBtn" class="end-game-button">End Game</button>
             </div>
         </div>
 
@@ -91,9 +97,8 @@
         </div>
     </div>
 
-    <!-- Add Supabase Client -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.7"></script>
     <!-- Your Game Scripts -->
+    <script src="auth.js"></script>
     <script src="trivia.js"></script>
     <script src="game.js"></script>
     <!-- Background Music -->
